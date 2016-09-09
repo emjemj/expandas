@@ -78,3 +78,66 @@ class BGPQ3Loader(BaseLoader):
             inet6.append(i)
 
         return ASNumber(asn, inet=inet, inet6=inet6)
+
+class RIPERESTLoader(BaseLoader):
+    """ Use RIPE's REST API to load data """
+
+    def load_asset(self, name):
+        self.expanded = {}
+        self.members = []
+        self.expand(name)
+
+        return ASSet(name, members = self.members)
+
+    def load_asn(self, asn):
+        import requests
+        import ipaddress
+
+        urlparams = {
+            "query-string": "AS{}".format(asn),
+            "inverse-attribute": "origin"
+        }
+
+        r = requests.get("http://rest.db.ripe.net/search.json", params=urlparams)
+
+        if r.status_code != requests.codes.ok:
+            raise Exception("Something went wrong")
+
+        inet = []
+        inet6 = []
+
+        for obj in r.json()["objects"]["object"]:
+            for attr in obj["attributes"]["attribute"]:
+                if attr["name"] == "route":
+                    inet.append(ipaddress.ip_network(attr["value"]))
+                if attr["name"] == "route6":
+                    inet6.append(ipaddress.ip_network(attr["value"]))
+
+        return ASNumber(asn, inet=inet, inet6=inet6)
+
+    def expand(self, asset):
+        """ Recursively expand as-set """
+        for attr in self.get_members(asset):
+            if attr["referenced-type"] == "aut-num":
+                asn = int(attr["value"].replace("AS", ""))
+                self.members.append(self.load_asn(asn))
+            else:
+                if attr["value"] in self.expanded:
+                    # Avoid infinite loop by keeping track of already
+                    # expanded entries
+                    continue
+                self.expanded[attr["value"]] = 1
+                self.expand(attr["value"])
+
+    def get_members(self, asset):
+        import requests
+        url = "http://rest.db.ripe.net/RIPE/AS-SET/{}.json".format(asset)
+        headers = { "content-type": "application/json" }
+        r = requests.get(url, headers=headers)
+
+        members = []
+        # This could probably do with some error handling
+        for attr in r.json()["objects"]["object"][0]["attributes"]["attribute"]:
+            if attr["name"] == "members":
+                members.append(attr)
+        return members
