@@ -17,11 +17,11 @@ class ASSet:
 class ASNumber:
     def __init__(self, asn, **kwargs):
 
-    if not "inet" in kwargs:
-        raise("Please supply a list of inet prefixes")
-    if not "inet6" in kwargs:
-        raise("Please supply a list of inet6 prefixes")
+        if not "inet" in kwargs:
+            raise("Please supply a list of inet prefixes")
+        if not "inet6" in kwargs:
+            raise("Please supply a list of inet6 prefixes")
 
-    self.asn = asn
-    self.inet = kwargs["inet"]
-    self.inet6 = kwargs["inet6"]
+        self.asn = asn
+        self.inet = kwargs["inet"]
+        self.inet6 = kwargs["inet6"]
