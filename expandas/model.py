@@ -1,23 +1,4 @@
-class BaseModel:
-    """ Abstract base model, implements methods used by both ASSet and ASNumber """
-
-    def contains(self, inet):
-        """ Check if as-set or asnumber contains a specified network """
-        import ipaddress
-        ip = ipaddress.ip_network(inet)
-
-        if ip.version == 4:
-            for i in self.inet:
-                if i.overlaps(ip):
-                    return True
-            return False
-        elif ip.version == 6:
-            for i in self.inet6:
-                if i.overlaps(ip):
-                    return True
-            return False
-
-class ASSet(BaseModel):
+class ASSet:
     def __init__(self, name, **kwargs):
     
         if not "members" in kwargs:
@@ -33,12 +14,38 @@ class ASSet(BaseModel):
             self.inet += member.inet
             self.inet6 += member.inet6
 
-    def contains_asn(self, asn):
-        if [ a for a in self.members if a.asn == int(asn) ]:
-            return True
-        return False
+    def __iter__(self):
+        for member in self.members:
+            yield member
 
-class ASNumber(BaseModel):
+    def __len__(self):
+        return len(self.members)
+
+    def __contains__(self, item):
+        import ipaddress
+
+        if type(item) is int:
+            # Assume integer argument is an ASN.
+            return [ a for a in self.members if a.asn == int(item) ]
+        elif type(item) is ASNumber:
+            return item in self.members
+        elif type(item) is str:
+            # Assume str argument is an ip network
+            ip = ipaddress.ip_network(item)
+
+            if ip.version == 4:
+                lst = self.inet
+            else:
+                lst = self.inet6
+
+            for i in lst:
+                if i.overlaps(ip):
+                    return True
+            return False
+        else:
+            return False
+
+class ASNumber:
     def __init__(self, asn, **kwargs):
 
         if not "inet" in kwargs:
@@ -49,3 +56,26 @@ class ASNumber(BaseModel):
         self.asn = int(asn)
         self.inet = kwargs["inet"]
         self.inet6 = kwargs["inet6"]
+
+    def __contains__(self, item):
+        import ipaddress
+
+        if type(item) is str:
+            ip = ipaddress.ip_network(item)
+
+            if ip.version == 4:
+                lst = self.inet
+            else:
+                lst = self.inet6
+
+            for i in lst:
+                if i.overlaps(ip):
+                    return True
+        return False
+
+    def __iter__(self):
+        for ip in self.inet + self.inet6:
+            yield ip
+
+    def __len__(self):
+        return len(self.inet + self.inet6)
