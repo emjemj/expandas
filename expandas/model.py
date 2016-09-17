@@ -14,6 +14,12 @@ class ASSet:
             self.inet += member.inet
             self.inet6 += member.inet6
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return "ASSet('{}', members={})".format(self.name, self.members)
+
     def __iter__(self):
         for member in self.members:
             yield member
@@ -56,6 +62,12 @@ class ASNumber:
         self.asn = int(asn)
         self.inet = kwargs["inet"]
         self.inet6 = kwargs["inet6"]
+
+    def __str__(self):
+        return "AS{}".format(self.asn)
+
+    def __repr__(self):
+        return "ASNumber({}, inet={}, inet6={})".format(self.asn, self.inet, self.inet6)
 
     def __contains__(self, item):
         import ipaddress
