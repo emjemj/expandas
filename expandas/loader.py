@@ -141,3 +141,161 @@ class RIPERESTLoader(BaseLoader):
             if attr["name"] == "members":
                 members.append(attr)
         return members
+
+class RIPEDumpLoader(BaseLoader):
+    """ Loader that fetches ripe database dumps and expands from that data """
+    files = [ "ripe.db.as-set.gz", "ripe.db.route.gz", "ripe.db.route6.gz" ]
+
+    def __init__(self):
+        self.inet = {}
+        self.inet6 = {}
+        self.assets = {}
+        self.expanded = {}
+        self.load_dumps()
+        self.parse_dumps()
+
+    def parse_dumps(self):
+        """ decompress and parse database dumps """
+        import gzip
+
+        parsers = {
+            "ripe.db.as-set.gz": self.asset_parser,
+            "ripe.db.route.gz": self.route_parser,
+            "ripe.db.route6.gz": self.route6_parser
+        }
+
+        for f in self.files:
+            fpath = "/tmp/{}".format(f)
+
+            with gzip.open(fpath, "rb") as handle:
+                for line in handle.readlines():
+                    line = line.strip().decode("ISO-8859-1")
+                    if line.find(":") != -1:
+                        tpl = line.split(":", 1)
+                        parsers[f](tpl[0].strip(), tpl[1].strip())
+
+    def asset_parser(self, key, val):
+        """ parse as-set dump """
+        import re
+
+        if key == "as-set":
+            self.curr = val
+            if val not in self.assets:
+                self.assets[val.upper()] = []
+        elif key == "members":
+            if val.find(",") != -1:
+                pcs = val.split(",")
+                for e in pcs:
+                    e = e.strip()
+                    if re.match("^AS\d+$", e):
+                        self.assets[self.curr.upper()].append({ "data": e, "type": "aut-num" })
+                    else:
+                        self.assets[self.curr.upper()].append({ "data": e.upper(), "type": "as-set" })
+            elif re.match("^AS\d+$", val):
+                self.assets[self.curr.upper()].append({ "data": val, "type": "aut-num" })
+            else:
+                self.assets[self.curr.upper()].append({ "data": val.upper(), "type": "as-set" })
+
+    def route_parser(self, key, val):
+        """ parse route dump """
+        if key == "route":
+            self.curr = val
+        elif key == "origin":
+            # Some weird people put comments in origin field
+            com = val.find("#")
+            if com != -1:
+                val = val[0:com]
+            asn = int(val.upper().replace("AS", ""))
+            if asn not in self.inet:
+                self.inet[asn] = []
+
+            self.inet[asn].append(self.curr)
+
+    def route6_parser(self, key, val):
+        """ parse route6 dump """
+        if key == "route6":
+            self.curr = val
+        elif key == "origin":
+             # Some weird people put comments in origin field
+            com = val.find("#")
+            if com != -1:
+                val = val[0:com]
+            asn = int(val.upper().replace("AS", ""))
+            if asn not in self.inet6:
+                self.inet6[asn] = []
+
+            self.inet6[asn].append(self.curr)
+
+    def load_dumps(self):
+        """ Download dump files if nonexistant or older than 24 hours """
+        import os
+        import time
+
+        # Download files if needed
+        for f in self.files:
+            fpath = "/tmp/{}".format(f)
+
+            if os.path.isfile(fpath):
+                st = os.stat(fpath)
+
+                if (time.time() - st.st_mtime) < (3600*24):
+                    # Don't download again if dump file is < 24h old.
+                    continue
+
+            self.fetch_dump(f)
+
+    def fetch_dump(self, filename):
+        """ download dump file from ripe, write to /tmp """
+        import requests
+
+        url = "http://ftp.ripe.net/ripe/dbase/split/{}".format(filename)
+
+        with open("/tmp/{}".format(filename), "wb") as handle:
+            r = requests.get(url)
+
+            for block in r.iter_content(8192):
+                handle.write(block)
+
+    def get_members(self, asset):
+        """ recursively get members of as-set """
+        members = []
+        asset = asset.upper()
+
+        if asset in self.assets:
+            if asset in self.expanded:
+                # avoid infinite loop
+                return []
+            for item in self.assets[asset]:
+                if item["type"] == "aut-num":
+                    members.append(item["data"])
+                else:
+                    self.expanded[item["data"]] = 1
+                    for m in self.get_members(item["data"]):
+                        members.append(m)
+        else:
+            # as-set not found :(
+            pass
+        return members
+
+    def load_asset(self, name):
+        members = []
+
+        for member in self.get_members(name):
+            asn = int(member.upper().replace("AS", ""))
+            members.append(self.load_asn(asn))
+
+        return ASSet(name, members=members)
+
+    def load_asn(self, asn):
+        import ipaddress
+        inet = []
+        inet6 = []
+
+        if asn in self.inet:
+            for i in self.inet[asn]:
+                inet.append(ipaddress.ip_network(i))
+        if asn in self.inet6:
+            for i in self.inet6[asn]:
+                inet6.append(ipaddress.ip_network(i))
+
+        return ASNumber(asn, inet=inet, inet6=inet6)
