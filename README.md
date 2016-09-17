@@ -1,7 +1,13 @@
 # expandas - A Python lib for expanding ASNs
+Expandas fetches data by the means of loaders, which enables multiple
+ways to fetch the data. All the loaders provide the data using the
+standard models - ASSet and ASNumber object.
 
-Expandas provides two different loaders, one using the RIPE REST API and one 
-executing bgpq3 to load data.
+The expandas distribution is delivered with the following loaders;
+
+ - **BGPQ3Loader** - Fetches data from whois servers, using bgpq3 binary
+ - **RIPERESTLoader** - Fetches data from the RIPE REST API
+ - **RIPEDumpLoader** - Downloads and parses ripe database dumps
 
 ### Sample usage
 ```
