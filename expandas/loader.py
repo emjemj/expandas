@@ -99,8 +99,12 @@ class RIPERESTLoader(BaseLoader):
 
         r = requests.get("http://rest.db.ripe.net/search.json", params=urlparams)
 
+        if r.status_code == requests.codes.not_found:
+            # No entries could be found, return empty lists for now
+            return ASNumber(asn, inet=[], inet6=[])
+
         if r.status_code != requests.codes.ok:
-            raise Exception("Something went wrong")
+            raise Exception("Something went wrong when expanding AS{}".format(asn))
 
         inet = []
         inet6 = []
