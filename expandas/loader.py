@@ -29,16 +29,15 @@ class BGPQ3Loader(BaseLoader):
 
         # Otherwise fallback to $BGPQ3_PATH environment variable
         t_path =  os.environ.get("BGPQ3_PATH", None)
-        if os.path.isfile(t_path) and os.access(t_path, os.X_OK):
+        if t_path is not None and os.path.isfile(t_path) and os.access(t_path, os.X_OK):
             return t_path
 
         # Last of all check $PATH environment variable
-        if not bgpq3_path:
-            for path in os.environ.get("PATH").split(os.pathsep):
-                t_path = os.path.join(path, "bgpq3")
+        for path in os.environ.get("PATH").split(os.pathsep):
+            t_path = os.path.join(path, "bgpq3")
 
-                if os.path.isfile(t_path) and os.access(t_path, os.X_OK):
-                    return t_path
+            if os.path.isfile(t_path) and os.access(t_path, os.X_OK):
+               return t_path
         # Give up
         raise Exception("Unable to find bgpq3 binary. Please install in $PATH, set $BGPQ3_PATH or specify in constructor")
 
