@@ -27,5 +27,4 @@ for member in as_glesys:
 
 if 2914 in as_glesys:
    # my asset contains as2914
-
 ```
