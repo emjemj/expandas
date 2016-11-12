@@ -8,5 +8,10 @@ setup(name="expandas",
     author_email="eric@emj.se",
     packages=["expandas"],
     install_requires=["requests"],
-    scripts=["expandas-cli.py"]
+    scripts=["expandas-cli.py"],
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+    ]
 )
