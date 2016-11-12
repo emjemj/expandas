@@ -122,7 +122,7 @@ class RIPERESTLoader(BaseLoader):
         """ Recursively expand as-set """
         for attr in self.get_members(asset):
             if attr["referenced-type"] == "aut-num":
-                asn = int(attr["value"].replace("AS", ""))
+                asn = int(attr["value"].upper().replace("AS", ""))
                 self.members.append(self.load_asn(asn))
             else:
                 if attr["value"] in self.expanded:
@@ -137,6 +137,10 @@ class RIPERESTLoader(BaseLoader):
         url = "http://rest.db.ripe.net/RIPE/AS-SET/{}.json".format(asset)
         headers = { "content-type": "application/json" }
         r = requests.get(url, headers=headers)
+
+        if r.status_code == requests.codes.not_found:
+            # Entry doesn't exist in RIPE database, return empty list
+            return []
 
         members = []
         # This could probably do with some error handling
